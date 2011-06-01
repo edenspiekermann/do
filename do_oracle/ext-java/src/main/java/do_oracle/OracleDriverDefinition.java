@@ -10,6 +10,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+
+import com.ibm.websphere.rsadapter.WSCallHelper;
 import oracle.jdbc.OraclePreparedStatement;
 import oracle.jdbc.OracleTypes;
 
@@ -147,14 +149,26 @@ public class OracleDriverDefinition extends AbstractDriverDefinition {
      */
     @Override
     public boolean registerPreparedStatementReturnParam(String sqlText, PreparedStatement ps, int idx) throws SQLException {
-        OraclePreparedStatement ops = (OraclePreparedStatement) ps;
-        Pattern p = Pattern.compile("^\\s*INSERT.+RETURNING.+INTO\\s+", Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(sqlText);
-        if (m.find()) {
-            ops.registerReturnParameter(idx, Types.BIGINT);
-            return true;
+        try{
+            //OraclePreparedStatement ops = (OraclePreparedStatement) ps;
+            Pattern p = Pattern.compile("^\\s*INSERT.+RETURNING.+INTO\\s+", Pattern.CASE_INSENSITIVE);
+            Matcher m = p.matcher(sqlText);
+            if (m.find()) {
+                //WSCallHelper.jdbcCall(oracle.jdbc.OraclePreparedStatement.class, ps,
+                //                      "registerReturnParameter",
+                //                      new Object[]{idx, Types.BIGINT},
+                //                      new Class[]{int.class, int.class});
+                WSCallHelper.jdbcCall(null, ps,
+                                      "registerReturnParameter",
+                                      new Object[]{idx, Types.BIGINT},
+                                      new Class[]{int.class, int.class}, null);
+                //ops.registerReturnParameter(idx, Types.BIGINT);
+                return true;
+            }
+            return false;
+        }catch(Exception ex){
+          return false;
         }
-        return false;
     }
 
     /**
@@ -165,13 +179,19 @@ public class OracleDriverDefinition extends AbstractDriverDefinition {
      */
     @Override
     public long getPreparedStatementReturnParam(PreparedStatement ps) throws SQLException {
-        OraclePreparedStatement ops = (OraclePreparedStatement) ps;
-        ResultSet rs = ops.getReturnResultSet();
+        //OraclePreparedStatement ops = (OraclePreparedStatement) ps;
+        //ResultSet rs = ops.getReturnResultSet();
+        //ResultSet rs = (ResultSet) WSCallHelper.jdbcCall(oracle.jdbc.OraclePreparedStatement.class, ps,
+        //                                                 "getReturnResultSet", new Object[]{}, new Class[]{});
+        ResultSet rs = null;
         try {
+            rs = (ResultSet) WSCallHelper.jdbcCall(null, ps, "getReturnResultSet", new Object[]{}, new Class[]{}, null);
             if (rs.next()) {
                 // Assuming that primary key will not be larger as long max value
                 return rs.getLong(1);
             }
+            return 0;
+        }catch(Exception ex){
             return 0;
         } finally {
             JDBCUtil.close(rs);
@@ -308,6 +328,9 @@ public class OracleDriverDefinition extends AbstractDriverDefinition {
      * @return
      */
     private Object getFieldValue(Object obj, String field) {
+        if(obj == null)
+            return null;
+
         Class c = obj.getClass();
         while (c != null) {
             try {
